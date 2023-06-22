@@ -6,10 +6,59 @@ use MongoDB\Client;
 // Connect to MongoDB
 $mongoClient = new Client('mongodb://localhost:27017');
 $database = $mongoClient->selectDatabase('Boshundhara');
-$collection = $database->selectCollection('News');
+
+// Generate and download CSV file
+if (isset($_GET['download']) && $_GET['download'] === 'csv') {
+    $collectionNames = $database->listCollectionNames();
+    $csvData = '';
+    
+    foreach ($collectionNames as $collectionName) {
+        $collection = $database->selectCollection($collectionName);
+        $cursor = $collection->find();
+        $data = iterator_to_array($cursor);
+
+        if (!empty($data)) {
+            $csvData .= implode(',', array_keys((array)$data[0])) . "\n";
+            foreach ($data as $document) {
+                $csvData .= implode(',', (array)$document) . "\n";
+            }
+        }
+    }
+
+    header('Content-Type: text/csv');
+    header('Content-Disposition: attachment; filename="data.csv"');
+    echo $csvData;
+    exit();
+}
+
+// Generate and download JSON file
+if (isset($_GET['download']) && $_GET['download'] === 'json') {
+    $collectionNames = $database->listCollectionNames();
+    $jsonData = [];
+    
+    foreach ($collectionNames as $collectionName) {
+        $collection = $database->selectCollection($collectionName);
+        $cursor = $collection->find();
+        $data = iterator_to_array($cursor);
+
+        if (!empty($data)) {
+            $jsonData = array_merge($jsonData, $data);
+        }
+    }
+
+    $jsonString = json_encode($jsonData, JSON_PRETTY_PRINT);
+
+    header('Content-Type: application/json');
+    header('Content-Disposition: attachment; filename="data.json"');
+    echo $jsonString;
+    exit();
+}
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $collectionName = $_POST['collection_name'];
+    $collection = $database->selectCollection($collectionName);
+
     $data = [
         'news_id' => $_POST['news_id'],
         'title' => $_POST['title'],
@@ -44,7 +93,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </nav>
     <div class="container">
         <h1>Insert News into MongoDB</h1>
+        
+        <!-- Download buttons -->
+       
+        
         <form method="post" action="<?php echo $_SERVER['PHP_SELF']; ?>">
+            <div class="form-group">
+                <label for="collection_name">Collection Name:</label>
+                <input type="text" name="collection_name" id="collection_name" class="form-control">
+            </div>
             <div class="form-group">
                 <label for="news_id">News ID:</label>
                 <input type="text" name="news_id" id="news_id" class="form-control">
@@ -65,7 +122,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <label for="newscol">Newscol:</label>
                 <input type="text" name="newscol" id="newscol" class="form-control">
             </div>
-            <input type="submit" value="Submit" class="btn btn-primary">
+            <input type="submit" value="Submit" class="btn btn-info">
+            <a href="<?php echo $_SERVER['PHP_SELF'] . '?download=csv'; ?>" class="btn btn-info">Download CSV</a>
+        <a href="<?php echo $_SERVER['PHP_SELF'] . '?download=json'; ?>" class="btn btn-info">Download JSON</a>
         </form>
     </div>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"></script>
